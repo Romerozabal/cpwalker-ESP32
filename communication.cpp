@@ -138,14 +138,14 @@ int cont1 = 0;
 int i = 0;
 int j[3];
 int k = 0;
-byte income[70]; // Datos de las articulaciones, obtenidos por la TI. [35bytes + 35bytes] 
-byte enviar[4], enviar1[4], enviar2[4], enviar3[4], enviar4[4], enviar5[4], enviar6[4], enviar7[4],can,pos,enviar8[4];
+byte income[62]; // Datos de las articulaciones, obtenidos por la TI. [35bytes + 35bytes] 
+byte enviar[4], enviar1[4], enviar2[4], enviar3[4], enviar4[4], enviar5[4], enviar6[4], enviar7[4],weightgauge[4],indexRight,indexLeft;
 void I2C() {
-
+  //Serial.printf("Ask for i2c Data");
   // Almacenar los datos procedentes del i2c mientras esten disponibles en variable "income"
   // [cabecera, cabecera, entero1, decimal1, separador, entero2 , decimal2, separador, ... ]
   cont1 = 0;
-  Wire.requestFrom(1, 70);
+  Wire.requestFrom(1, 62);
   while (Wire.available()) {
     byte datos = Wire.read();
     income[cont1] = datos;
@@ -157,7 +157,7 @@ void I2C() {
   // El formato de mensaje que recibe de la TI es el siguiente:
   // [cabecera, cabecera, entero1, decimal1, separador, entero2 , decimal2, separador, ... ]
   cont1 = 0;
-  for (i = 0; i < 70; i++) {
+  for (i = 0; i < 62; i++) {
     if (income[i] == 255 && income[(i + 1)%70] == 255) {
       j[cont1] = i;
       cont1++;
@@ -178,66 +178,66 @@ void I2C() {
   k = j[i];
 
   // Valor angular real de rodilla izquierda
-  enviar[0] = income[(k + 2) % 70]; // Signo del digito. Si es 0 logico es positivo, si es 1 logico es negativo 
-  enviar[1] = income[(k + 4) % 70]; // Valor real LSB ?
-  enviar[2] = income[(k + 5) % 70]; // Valores decimal MSB ?
-  enviar[3] = income[(k + 6) % 70]; // Valores decimales LSB ?
+  enviar[0] = income[(k + 2) % 62]; // Signo del digito. Si es 0 logico es positivo, si es 1 logico es negativo 
+  enviar[1] = income[(k + 4) % 62]; // Decimal
+  enviar[2] = income[(k + 5) % 62]; // First decimal 1
+  enviar[3] = income[(k + 6) % 62]; // First deciaml 2
 
   // Salto del byte del delimitador (¿no deberían ser 2? 16bits de 0 = 2 8bits de 0)
 
   // Posicion de referencia de rodilla izquierda
-  enviar1[0] = income[(k + 8) % 70];
-  enviar1[1] = income[(k + 10) % 70];
-  enviar1[2] = income[(k + 11) % 70];
-  enviar1[3] = income[(k + 12) % 70];
+  enviar1[0] = income[(k + 8) % 62];
+  enviar1[1] = income[(k + 10) % 62];
+  enviar1[2] = income[(k + 11) % 62];
+  enviar1[3] = income[(k + 12) % 62];
 
   // Valor angular real de rodilla derecha
-  enviar2[0] = income[(k + 14) % 70];
-  enviar2[1] = income[(k + 16) % 70];
-  enviar2[2] = income[(k + 17) % 70];
-  enviar2[3] = income[(k + 18) % 70];
+  enviar2[0] = income[(k + 14) % 62];
+  enviar2[1] = income[(k + 16) % 62];
+  enviar2[2] = income[(k + 17) % 62];
+  enviar2[3] = income[(k + 18) % 62];
 
   // Posicion de referencia de rodilla derecha
-  enviar3[0] = income[(k + 20) % 70];
-  enviar3[1] = income[(k + 22) % 70];
-  enviar3[2] = income[(k + 23) % 70];
-  enviar3[3] = income[(k + 24) % 70];
+  enviar3[0] = income[(k + 20) % 62];
+  enviar3[1] = income[(k + 22) % 62];
+  enviar3[2] = income[(k + 23) % 62];
+  enviar3[3] = income[(k + 24) % 62];
   
   // Valor angular real de cadera izquierda
-  enviar4[0] = income[(k + 26) % 70];
-  enviar4[1] = income[(k + 28) % 70];
-  enviar4[2] = income[(k + 29) % 70];
-  enviar4[3] = income[(k + 30) % 70];
+  enviar4[0] = income[(k + 26) % 62];
+  enviar4[1] = income[(k + 28) % 62];
+  enviar4[2] = income[(k + 29) % 62];
+  enviar4[3] = income[(k + 30) % 62];
   
   // Posicion de referencia de cadera izquierda
-  enviar5[0] = income[(k + 32) % 70];
-  enviar5[1] = income[(k + 34) % 70];
-  enviar5[2] = income[(k + 35) % 70];
-  enviar5[3] = income[(k + 36) % 70];
+  enviar5[0] = income[(k + 32) % 62];
+  enviar5[1] = income[(k + 34) % 62];
+  enviar5[2] = income[(k + 35) % 62];
+  enviar5[3] = income[(k + 36) % 62];
 
   // Valor angular real de cadera derecha
-  enviar6[0] = income[(k + 38) % 70];
-  enviar6[1] = income[(k + 40) % 70];
-  enviar6[2] = income[(k + 41) % 70];
-  enviar6[3] = income[(k + 42) % 70];
+  enviar6[0] = income[(k + 38) % 62];
+  enviar6[1] = income[(k + 40) % 62];
+  enviar6[2] = income[(k + 41) % 62];
+  enviar6[3] = income[(k + 42) % 62];
 
   // Posicion de referencia de cadera derecha
-  enviar7[0] = income[(k + 44) % 70];
-  enviar7[1] = income[(k + 46) % 70];
-  enviar7[2] = income[(k + 47) % 70];
-  enviar7[3] = income[(k + 48) % 70];
+  enviar7[0] = income[(k + 44) % 62];
+  enviar7[1] = income[(k + 46) % 62];
+  enviar7[2] = income[(k + 47) % 62];
+  enviar7[3] = income[(k + 48) % 62];
 
   // Peso galga
-  enviar8[0] = income[(k + 56) % 70];
-  enviar8[1] = income[(k + 58) % 70];
-  enviar8[2] = income[(k + 59) % 70];
-  enviar8[3] = income[(k + 60) % 70];
+  weightgauge[0] = income[(k + 50) % 62];
+  weightgauge[1] = income[(k + 52) % 62];
+  weightgauge[2] = income[(k + 53) % 62];
+  weightgauge[3] = income[(k + 54) % 62];
 
-  // Error de CAN
-  can = income[(k + 52) % 70];
+  // Index right knee
+  indexRight = income[(k + 56) % 62];
 
-  // Error de posicion
-  pos = income[(k + 64) % 70];
+  // Index left knee
+  indexLeft = income[(k + 58) % 62];
   
   // Rodilla izquierda
   udp1.beginPacket(IPAddress(192, 168, 4, 1), 10001);
@@ -273,27 +273,23 @@ void I2C() {
     
   // Peso de galga
   udp5.beginPacket(IPAddress(192, 168, 4, 1), 10005);
-    udp5.write(enviar8, sizeof(enviar8));
+    udp5.write(weightgauge, sizeof(weightgauge));
     udp5.endPacket();
     
-  // Error de CAN
+  // IndexRight
   udp5.beginPacket(IPAddress(192, 168, 4, 1), 10006);
-    udp5.write(can);
+    udp5.write(indexRight);
     udp5.endPacket();
     
-  // Error de posicion
+  // IndexLeft
   udp5.beginPacket(IPAddress(192, 168, 4, 1), 10007);
-    udp5.write(pos);
+    udp5.write(indexLeft);
     udp5.endPacket();
-
+  
   // Debug spi received, sended via udp
   count_sended_msgs = count_sended_msgs + 1; 
   if (count_sended_msgs == 1000) {
     count_sended_msgs = 0;
-    Serial.printf("\nRodilla izquierda %d, %d", enviar, enviar1);
-    Serial.printf("\nRodilla derecha %d, %d", enviar2, enviar3);
-    Serial.printf("\nCadera izquierda %d, %d", enviar4, enviar5);
-    Serial.printf("\nCadera derecha %d, %d", enviar6, enviar7);
   }
   
 }

@@ -17,6 +17,7 @@ void SPI_configuracion() {
   spiA->begin();
   pinMode(5, OUTPUT);
   spiC = new SPIClass(HSPI);
+  //SCK, MISO,MOSI, and SS
   spiC->begin(26, 12, 13, 15);
   pinMode(15, OUTPUT);
 }
@@ -34,7 +35,7 @@ IPAddress subnet(255, 255, 255, 0);
 
 
 
-WiFiUDP udp50012,udp50015, udp50011, udp50016, udpCheckConn, udp1, udp2, udp3, udp4, udp5;
+WiFiUDP udp50012,udp50015, udp50011, udp50016, udpCheckConn, udp1, udp2, udp3, udp4, udp5,udp6,udp7;
 boolean conectado = false;
 void init_LEDS(){
   ledcSetup(channel, freq, res);

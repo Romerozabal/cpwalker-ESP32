@@ -10,6 +10,8 @@
 */
 int cont = 0, check = 0;
 
+int printworking = 0;
+
 void setup() {
   setCpuFrequencyMhz(40);
   init_LEDS();
@@ -28,7 +30,11 @@ void setup() {
 */
 void (*resetFunc)(void) = 0;
 void loop() {
-  
+  if (printworking >= 1000) {
+    Serial.printf("Working\n");
+    printworking = 0;
+  }
+  printworking ++;
   if (cont == 0) {
     digitalWrite(TI_RST, HIGH);
     delay(50);
@@ -38,7 +44,6 @@ void loop() {
   }
   /*Comprobar si hay algun paquete de udp con "parsePacket()"*/
   check = udpCheckConn.parsePacket();
-  Serial.printf("Check: %d", check);
   if (check) {
     Serial.printf("\nReceive from port 9999\n");
     char app = udpCheckConn.read();

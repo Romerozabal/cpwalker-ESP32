@@ -21,7 +21,7 @@ extern const int spiClk;
 extern SPIClass * spiA;
 extern SPIClass * spiC;
 extern boolean conectado;
-extern WiFiUDP udp50012,udp50015, udp50011,udp50016, udpCheckConn, udp1, udp2, udp3, udp4, udp5; // Objetos WifiUDP, envia y recive datos UDP. En placas basadas en AVR, los paquetes de salida estan limitados a 72 bytes
+extern WiFiUDP udp50012,udp50015, udp50011,udp50016, udpCheckConn, udp1, udp2, udp3, udp4, udp5, udp6, udp7; // Objetos WifiUDP, envia y recive datos UDP. En placas basadas en AVR, los paquetes de salida estan limitados a 72 bytes
 
 void SPI_configuracion(void);
 void WIFI_configuracion(void);
