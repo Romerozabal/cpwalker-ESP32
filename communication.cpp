@@ -2,9 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-
-unsigned int count_sended_msgs = 0; 
-
 /*
   Union con 2 tpios de datos declarados, 32 bytes y 8 floats
 */
@@ -24,6 +21,7 @@ void esperar_paquete_Udp() {
   int packetSize50012 = udp50012.parsePacket();
   int packetSize50015 = udp50015.parsePacket();
   int packetSize50016 = udp50016.parsePacket();
+  int packetSize50017 = udp50017.parsePacket();
   if (packetSize50011) {
     read_UDP(50011, packetSize50011);
     Serial.printf("\nReceived %d bytes from %s, port %d\n", packetSize50011, udp50011.remoteIP().toString().c_str(), udp50011.remotePort());
@@ -39,6 +37,10 @@ void esperar_paquete_Udp() {
   if (packetSize50016) {
     read_UDP(50016, packetSize50016);
     Serial.printf("\nReceived %d bytes from %s, port %d\n", packetSize50016, udp50016.remoteIP().toString().c_str(), udp50016.remotePort());
+  }
+  if (packetSize50017) {
+    read_UDP(50017, packetSize50017);
+    Serial.printf("\nReceived %d bytes from %s, port %d\n", packetSize50017, udp50017.remoteIP().toString().c_str(), udp50017.remotePort());
   }
 }
 
@@ -66,6 +68,9 @@ void read_UDP(int port, int packetSize)
     case 50016:
       udp50016.read(&buf_trac1.bytes[0], read_size);
       enviar_en_spiA(buf_trac1.bytes, packetSize,uint16_t(50016));
+    case 50017:
+      udp50017.read(&buf_trac1.bytes[0], read_size);
+      enviar_en_spiA(buf_trac1.bytes, packetSize,uint16_t(50017)); 
     break;
 
   }
@@ -134,162 +139,182 @@ void enviar_en_spiA(byte* data_wifi, int len, uint16_t port_A) {
   Los datos recibidos son enviados a la aplicación a traves de paquetes UDP.
   Cada puerto contiene la información relativa a una articulación:10001-LK,10002-RK,10003-LH,10004-RH
 */
-int cont1 = 0;
-int i = 0;
-int j[3];
-int k = 0;
-byte income[62]; // Datos de las articulaciones, obtenidos por la TI. [35bytes + 35bytes] 
-byte enviar[4], enviar1[4], enviar2[4], enviar3[4], enviar4[4], enviar5[4], enviar6[4], enviar7[4],weightgauge[4],indexRight,indexLeft;
+int msg_header_pos = 0;
+int msg_size = 72; // Envían desde la Texas 36 datos in16 = 72 datos int8 recibidos por ESP32
+byte income[72]; // Datos recibidos por el bus I2C
+byte left_knee_pot[4], left_knee_ref[4], right_knee_pot[4], right_knee_ref[4], left_hip_pot[4], left_hip_ref[4], right_hip_pot[4], right_hip_ref[4],weightgauge[4],indexRight,indexLeft, left_knee_torque[4], right_knee_torque[4], left_hip_torque[4], right_hip_torque[4], elev_ref, traction_ref[4], left_wheel_vel[4], right_wheel_vel[4];
+
+// Recibir datos de Texas
 void I2C() {
-  //Serial.printf("Ask for i2c Data");
   // Almacenar los datos procedentes del i2c mientras esten disponibles en variable "income"
-  // [cabecera, cabecera, entero1, decimal1, separador, entero2 , decimal2, separador, ... ]
-  cont1 = 0;
-  Wire.requestFrom(1, 62);
+  int index = 0;
+  Wire.requestFrom(1, 72);
   while (Wire.available()) {
     byte datos = Wire.read();
-    income[cont1] = datos;
-    cont1++;
+    int8_t dato = (int8_t)datos;
+    income[index] = datos;
+    index++;
   }
 
-  // Busca cabecera del mensaje [255, 255, 255, 255, ... data ... ] y guarda sus posiciones. 
-  // Desde TI los datos se envian en formato de 16 bits, en ESP32 se reciben como dos datos de 8 bits.
-  // El formato de mensaje que recibe de la TI es el siguiente:
-  // [cabecera, cabecera, entero1, decimal1, separador, entero2 , decimal2, separador, ... ]
-  cont1 = 0;
-  for (i = 0; i < 62; i++) {
-    if (income[i] == 255 && income[(i + 1)%70] == 255) {
-      j[cont1] = i;
-      cont1++;
-    }
-    if (cont1 == 3) {
+  // Busca posición del último dato de la cabecera [255, >255< , ... data ... ] y guarda sus posiciones. 
+  index = 0;
+  for (int i = 0; i < msg_size; i++) {
+    if (income[i] == 255 && income[(i + 1) % msg_size] == 255) {
+      msg_header_pos = i + 1;
       break;
     }
   }
-
-  // Busca la posición del ultimo dato de cabecera para empezar a leer los datos y la almacena en la variable "i" definida previamente.
-  for (i = 0; i < 3; i++) {
-    if (j[(i + 1) % 3] != (j[i] + 1)) {
-      break;
-    }
-  }
-
-  // Ultimo mensaje de cabecera
-  k = j[i];
-
+  
   // Valor angular real de rodilla izquierda
-  enviar[0] = income[(k + 2) % 62]; // Signo del digito. Si es 0 logico es positivo, si es 1 logico es negativo 
-  enviar[1] = income[(k + 4) % 62]; // Decimal
-  enviar[2] = income[(k + 5) % 62]; // First decimal 1
-  enviar[3] = income[(k + 6) % 62]; // First deciaml 2
-
-  // Salto del byte del delimitador (¿no deberían ser 2? 16bits de 0 = 2 8bits de 0)
+  left_knee_pot[0] = income[(msg_header_pos + 1) % msg_size]; // Entero
+  left_knee_pot[1] = income[(msg_header_pos + 2) % msg_size]; // Entero
+  left_knee_pot[2] = income[(msg_header_pos + 3) % msg_size]; // Decimal
+  left_knee_pot[3] = income[(msg_header_pos + 4) % msg_size]; // Decimal
 
   // Posicion de referencia de rodilla izquierda
-  enviar1[0] = income[(k + 8) % 62];
-  enviar1[1] = income[(k + 10) % 62];
-  enviar1[2] = income[(k + 11) % 62];
-  enviar1[3] = income[(k + 12) % 62];
+  left_knee_ref[0] = income[(msg_header_pos + 5) % msg_size];
+  left_knee_ref[1] = income[(msg_header_pos + 6) % msg_size];
+  left_knee_ref[2] = income[(msg_header_pos + 7) % msg_size];
+  left_knee_ref[3] = income[(msg_header_pos + 8) % msg_size];
 
   // Valor angular real de rodilla derecha
-  enviar2[0] = income[(k + 14) % 62];
-  enviar2[1] = income[(k + 16) % 62];
-  enviar2[2] = income[(k + 17) % 62];
-  enviar2[3] = income[(k + 18) % 62];
+  right_knee_pot[0] = income[(msg_header_pos + 9) % msg_size];
+  right_knee_pot[1] = income[(msg_header_pos + 10) % msg_size];
+  right_knee_pot[2] = income[(msg_header_pos + 11) % msg_size];
+  right_knee_pot[3] = income[(msg_header_pos + 12) % msg_size];
 
   // Posicion de referencia de rodilla derecha
-  enviar3[0] = income[(k + 20) % 62];
-  enviar3[1] = income[(k + 22) % 62];
-  enviar3[2] = income[(k + 23) % 62];
-  enviar3[3] = income[(k + 24) % 62];
+  right_knee_ref[0] = income[(msg_header_pos + 13) % msg_size];
+  right_knee_ref[1] = income[(msg_header_pos + 14) % msg_size];
+  right_knee_ref[2] = income[(msg_header_pos + 15) % msg_size];
+  right_knee_ref[3] = income[(msg_header_pos + 16) % msg_size];
   
   // Valor angular real de cadera izquierda
-  enviar4[0] = income[(k + 26) % 62];
-  enviar4[1] = income[(k + 28) % 62];
-  enviar4[2] = income[(k + 29) % 62];
-  enviar4[3] = income[(k + 30) % 62];
+  left_hip_pot[0] = income[(msg_header_pos + 17) % msg_size];
+  left_hip_pot[1] = income[(msg_header_pos + 18) % msg_size];
+  left_hip_pot[2] = income[(msg_header_pos + 19) % msg_size];
+  left_hip_pot[3] = income[(msg_header_pos + 20) % msg_size];
   
   // Posicion de referencia de cadera izquierda
-  enviar5[0] = income[(k + 32) % 62];
-  enviar5[1] = income[(k + 34) % 62];
-  enviar5[2] = income[(k + 35) % 62];
-  enviar5[3] = income[(k + 36) % 62];
+  left_hip_ref[0] = income[(msg_header_pos + 21) % msg_size];
+  left_hip_ref[1] = income[(msg_header_pos + 22) % msg_size];
+  left_hip_ref[2] = income[(msg_header_pos + 23) % msg_size];
+  left_hip_ref[3] = income[(msg_header_pos + 24) % msg_size];
 
   // Valor angular real de cadera derecha
-  enviar6[0] = income[(k + 38) % 62];
-  enviar6[1] = income[(k + 40) % 62];
-  enviar6[2] = income[(k + 41) % 62];
-  enviar6[3] = income[(k + 42) % 62];
+  right_hip_pot[0] = income[(msg_header_pos + 25) % msg_size];
+  right_hip_pot[1] = income[(msg_header_pos + 26) % msg_size];
+  right_hip_pot[2] = income[(msg_header_pos + 27) % msg_size];
+  right_hip_pot[3] = income[(msg_header_pos + 28) % msg_size];
 
   // Posicion de referencia de cadera derecha
-  enviar7[0] = income[(k + 44) % 62];
-  enviar7[1] = income[(k + 46) % 62];
-  enviar7[2] = income[(k + 47) % 62];
-  enviar7[3] = income[(k + 48) % 62];
+  right_hip_ref[0] = income[(msg_header_pos + 29) % msg_size];
+  right_hip_ref[1] = income[(msg_header_pos + 30) % msg_size];
+  right_hip_ref[2] = income[(msg_header_pos + 31) % msg_size];
+  right_hip_ref[3] = income[(msg_header_pos + 32) % msg_size];
 
   // Peso galga
-  weightgauge[0] = income[(k + 50) % 62];
-  weightgauge[1] = income[(k + 52) % 62];
-  weightgauge[2] = income[(k + 53) % 62];
-  weightgauge[3] = income[(k + 54) % 62];
-
-  // Index right knee
-  indexRight = income[(k + 56) % 62];
+  weightgauge[0] = income[(msg_header_pos + 33) % msg_size];
+  weightgauge[1] = income[(msg_header_pos + 34) % msg_size];
+  weightgauge[2] = income[(msg_header_pos + 35) % msg_size];
+  weightgauge[3] = income[(msg_header_pos + 36) % msg_size];
 
   // Index left knee
-  indexLeft = income[(k + 58) % 62];
+  indexLeft = income[(msg_header_pos + 38) % msg_size];
+
+  // Index right knee
+  indexRight = income[(msg_header_pos + 40) % msg_size];
   
-  // Rodilla izquierda
-  udp1.beginPacket(IPAddress(192, 168, 4, 1), 10001);
-    // Posicion real
-    udp1.write(enviar, sizeof(enviar));
-    // Posicion de referencia
-    udp1.write(enviar1, sizeof(enviar1));
-    udp1.endPacket();
-    
-  // Rodilla derecha
-  udp2.beginPacket(IPAddress(192, 168, 4, 1), 10002);
-    // Posicion real
-    udp2.write(enviar2, sizeof(enviar2));
-    // Posicion de referencia
-    udp2.write(enviar3, sizeof(enviar3));
-    udp2.endPacket();
-    
-  // Cadera izquierda
-  udp3.beginPacket(IPAddress(192, 168, 4, 1), 10003);
-    // Posicion real
-    udp3.write(enviar4, sizeof(enviar4));
-    // Posicion de referencia
-    udp3.write(enviar5, sizeof(enviar5));
-    udp3.endPacket();
-    
-  // Cadera derecha
-  udp4.beginPacket(IPAddress(192, 168, 4, 1), 10004);
-    // Posicion real
-    udp4.write(enviar6, sizeof(enviar6));
-    // Posicion de referencia
-    udp4.write(enviar7, sizeof(enviar7));
-    udp4.endPacket();
-    
-  // Peso de galga
-  udp5.beginPacket(IPAddress(192, 168, 4, 1), 10005);
-    udp5.write(weightgauge, sizeof(weightgauge));
-    udp5.endPacket();
-    
-  // IndexRight
-  udp5.beginPacket(IPAddress(192, 168, 4, 1), 10006);
-    udp5.write(indexRight);
-    udp5.endPacket();
-    
-  // IndexLeft
-  udp5.beginPacket(IPAddress(192, 168, 4, 1), 10007);
-    udp5.write(indexLeft);
-    udp5.endPacket();
+  // Torque rodilla izquierda
+  left_knee_torque[0] = income[(msg_header_pos + 41) % msg_size];
+  left_knee_torque[1] = income[(msg_header_pos + 42) % msg_size];
+  left_knee_torque[2] = income[(msg_header_pos + 43) % msg_size];
+  left_knee_torque[3] = income[(msg_header_pos + 44) % msg_size];
   
-  // Debug spi received, sended via udp
-  count_sended_msgs = count_sended_msgs + 1; 
-  if (count_sended_msgs == 1000) {
-    count_sended_msgs = 0;
-  }
+  // Torque rodilla derecha
+  right_knee_torque[0] = income[(msg_header_pos + 45) % msg_size];
+  right_knee_torque[1] = income[(msg_header_pos + 46) % msg_size];
+  right_knee_torque[2] = income[(msg_header_pos + 47) % msg_size];
+  right_knee_torque[3] = income[(msg_header_pos + 48) % msg_size];
   
+  // Torque cadera izquierda
+  left_hip_torque[0] = income[(msg_header_pos + 49) % msg_size];
+  left_hip_torque[1] = income[(msg_header_pos + 50) % msg_size];
+  left_hip_torque[2] = income[(msg_header_pos + 51) % msg_size];
+  left_hip_torque[3] = income[(msg_header_pos + 52) % msg_size];
+  
+  // Torque cadera derecha
+  right_hip_torque[0] = income[(msg_header_pos + 53) % msg_size];
+  right_hip_torque[1] = income[(msg_header_pos + 54) % msg_size];
+  right_hip_torque[2] = income[(msg_header_pos + 55) % msg_size];
+  right_hip_torque[3] = income[(msg_header_pos + 56) % msg_size];
+
+  // Elevation reference
+  elev_ref = income[(msg_header_pos + 58) % msg_size];
+
+  // Traction reference
+  traction_ref[0] = income[(msg_header_pos + 59) % msg_size];
+  traction_ref[1] = income[(msg_header_pos + 60) % msg_size];
+  traction_ref[2] = income[(msg_header_pos + 61) % msg_size];
+  traction_ref[3] = income[(msg_header_pos + 62) % msg_size];
+
+  // Left Wheel velocitu
+  left_wheel_vel[0] = income[(msg_header_pos + 63) % msg_size];
+  left_wheel_vel[1] = income[(msg_header_pos + 64) % msg_size];
+  left_wheel_vel[2] = income[(msg_header_pos + 65) % msg_size];
+  left_wheel_vel[3] = income[(msg_header_pos + 66) % msg_size];
+
+  // Right Wheel velocitu
+  right_wheel_vel[0] = income[(msg_header_pos + 67) % msg_size];
+  right_wheel_vel[1] = income[(msg_header_pos + 68) % msg_size];
+  right_wheel_vel[2] = income[(msg_header_pos + 69) % msg_size];
+  right_wheel_vel[3] = income[(msg_header_pos + 70) % msg_size];
+
+  // Send message
+  udp.beginPacket(IPAddress(192, 168, 4, 3), 10000);
+   // Rodilla izquierda
+      // Posicion real
+      udp.write(left_knee_pot, sizeof(left_knee_pot));
+      // Posicion de referencia
+      udp.write(left_knee_ref, sizeof(left_knee_ref));
+   // Rodilla derecha
+      // Posicion real
+      udp.write(right_knee_pot, sizeof(right_knee_pot));
+      // Posicion de referencia
+      udp.write(right_knee_ref, sizeof(right_knee_ref));
+   // Cadera izquierda
+      // Posicion real
+      udp.write(left_hip_pot, sizeof(left_hip_pot));
+      // Posicion de referencia
+      udp.write(left_hip_ref, sizeof(left_hip_ref));
+   // Cadera derecha
+      // Posicion real
+      udp.write(right_hip_pot, sizeof(right_hip_pot));
+      // Posicion de referencia
+      udp.write(right_hip_ref, sizeof(right_hip_ref));
+      // Index
+      udp.write(indexRight);
+      udp.write(indexLeft);
+   // Torque
+      // Rodilla Izquierda
+      udp.write(left_knee_torque, sizeof(left_knee_torque));
+      // Rodilla Derecha
+      udp.write(right_knee_torque, sizeof(right_hip_ref));
+      // Cadera Izquierda
+      udp.write(left_hip_torque, sizeof(left_knee_torque));
+      // Cadera Derecha
+      udp.write(right_hip_torque, sizeof(right_hip_ref));
+      // Peso de galga
+      udp.write(weightgauge, sizeof(weightgauge));
+   // Elevación
+      udp.write(elev_ref);
+   // Tracción
+      // Referencia
+      udp.write(traction_ref, sizeof(left_knee_torque));
+      // Velocidad rueda izquierda
+      udp.write(left_wheel_vel, sizeof(right_hip_ref));
+      // Velocidad rueda derecha
+      udp.write(left_wheel_vel, sizeof(right_hip_ref));
+    udp.endPacket();
+    Serial.printf("%d \n", millis());
 }

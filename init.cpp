@@ -35,7 +35,7 @@ IPAddress subnet(255, 255, 255, 0);
 
 
 
-WiFiUDP udp50012,udp50015, udp50011, udp50016, udpCheckConn, udp1, udp2, udp3, udp4, udp5,udp6,udp7;
+WiFiUDP udp50012,udp50015, udp50011, udp50016, udp50017, udpCheckConn, udp;
 boolean conectado = false;
 void init_LEDS(){
   ledcSetup(channel, freq, res);
@@ -57,8 +57,9 @@ void WIFI_configuracion() {
   WiFi.begin(ssid, password);
   
   while (WiFi.status() != WL_CONNECTED)
-    {    delay(1000);
-         Serial.print(".");
+    {    
+      delay(1000);
+      Serial.print(WiFi.status());
     }
   Serial.println("WiFi connected..!");
   Serial.print("Got IP: ");  
@@ -79,5 +80,6 @@ void WIFI_configuracion() {
   udp50012.begin(50012);
   udp50011.begin(50011);
   udp50016.begin(50016);
+  udp50017.begin(50017);
   udpCheckConn.begin(9999);
 }

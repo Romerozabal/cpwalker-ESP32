@@ -8,6 +8,7 @@
   conexion es el gpio 0 de ls ESP32 declarado en init.cpp
   SPI_check es el gpio 2 de la ESP32 declarado en init.cpp
 */
+
 int cont = 0, check = 0;
 
 int printworking = 0;
@@ -44,20 +45,7 @@ void loop() {
   }
   /*Comprobar si hay algun paquete de udp con "parsePacket()"*/
   check = udpCheckConn.parsePacket();
-  if (check) {
-    Serial.printf("\nReceive from port 9999\n");
-    char app = udpCheckConn.read();
-    int rec = app;
-    Serial.printf("Received: %d", rec);
-    if (rec == 255 ) {
-        resetFunc();
-      Serial.printf("\nresetFunction()\n");
-    }
-    else{
-      ledcWrite(channel, 0);
-      ledcWrite(channel1, pow(2,16) * porcentaje);
-    }
-  }
+
   if (conectado) {
     esperar_paquete_Udp();
     I2C();
